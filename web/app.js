@@ -323,7 +323,9 @@ function renderNotes() {
 
 function renderTree() {
   elements.treeGrid.innerHTML = "";
-  const layers = state.treeLayers.length > 0 ? state.treeLayers : [[state.roots.at(-1)]];
+  const layers = state.treeLayers.length > 0
+    ? state.treeLayers
+    : [[{ hash: state.roots.at(-1), isFilled: false }]];
   const displayLayers = layers.slice().reverse();
 
   displayLayers.forEach((layer, displayIndex) => {
@@ -332,22 +334,22 @@ function renderTree() {
     row.className = "tree-row";
     row.style.setProperty("--node-count", layer.length);
 
-    layer.forEach((hash, nodeIndex) => {
+    layer.forEach((treeNode, nodeIndex) => {
       const node = document.createElement("div");
       const isRoot = originalLayerIndex === layers.length - 1;
       const isLeaf = originalLayerIndex === 0;
-      const isFilledLeaf = isLeaf && nodeIndex < state.commitments.length;
-      const isEmptyLeaf = isLeaf && !isFilledLeaf;
-      const isComputed = !isRoot && !isLeaf;
-      const label = getTreeNodeLabel({ isRoot, isLeaf, isFilledLeaf, nodeIndex });
-      const value = isEmptyLeaf ? "Empty" : shortHash(hash).replace("0x", "");
+      const isFilledLeaf = isLeaf && treeNode.isFilled;
+      const isEmptySubtree = !treeNode.isFilled && !isRoot;
+      const isComputed = !isRoot && !isLeaf && treeNode.isFilled;
+      const label = getTreeNodeLabel({ isRoot, isLeaf, isFilledLeaf, isEmptySubtree, nodeIndex });
+      const value = isEmptySubtree ? "Empty" : shortHash(treeNode.hash).replace("0x", "");
 
       node.className = [
         "tree-node",
         isRoot ? "is-root" : "",
         isLeaf ? "is-leaf" : "",
         isFilledLeaf ? "is-filled" : "",
-        isEmptyLeaf ? "is-empty" : "",
+        isEmptySubtree ? "is-empty" : "",
         isComputed ? "is-computed" : ""
       ].filter(Boolean).join(" ");
       node.innerHTML = `<span>${label}</span><code>${value}</code>`;
@@ -358,22 +360,28 @@ function renderTree() {
   });
 }
 
-function getTreeNodeLabel({ isRoot, isLeaf, isFilledLeaf, nodeIndex }) {
+function getTreeNodeLabel({ isRoot, isLeaf, isFilledLeaf, isEmptySubtree, nodeIndex }) {
   if (isRoot) return "Current root";
   if (isFilledLeaf) return `Commitment L${nodeIndex}`;
-  if (isLeaf) return `Empty L${nodeIndex}`;
+  if (isEmptySubtree) return isLeaf ? `Empty L${nodeIndex}` : "Empty";
   return "Computed hash";
 }
 
 async function updateMerkleState() {
   state.treeLayers = await buildMerkleLayers(state.commitments);
-  state.roots.push(state.treeLayers.at(-1)[0]);
+  state.roots.push(state.treeLayers.at(-1)[0].hash);
 }
 
 async function buildMerkleLayers(commitments) {
-  const leaves = commitments.slice(0, 16);
+  const leaves = commitments.slice(0, 16).map((hash) => ({
+    hash,
+    isFilled: true
+  }));
   while (leaves.length < 16) {
-    leaves.push(await hashParts("zero", leaves.length));
+    leaves.push({
+      hash: await hashParts("zero", leaves.length),
+      isFilled: false
+    });
   }
 
   const layers = [leaves];
@@ -382,7 +390,12 @@ async function buildMerkleLayers(commitments) {
   while (layer.length > 1) {
     const next = [];
     for (let index = 0; index < layer.length; index += 2) {
-      next.push(await hashParts(layer[index], layer[index + 1]));
+      const left = layer[index];
+      const right = layer[index + 1];
+      next.push({
+        hash: await hashParts(left.hash, right.hash),
+        isFilled: left.isFilled || right.isFilled
+      });
     }
     layers.push(next);
     layer = next;
