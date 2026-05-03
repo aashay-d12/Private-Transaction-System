@@ -29,15 +29,22 @@ function init() {
   fillSelect(elements.depositOwner, users);
   fillSelect(elements.recipient, users.filter((user) => user !== "Alice"));
   bindEvents();
-  seedDemo().then(render);
+  rebuildState().then(render);
 }
 
 function bindEvents() {
   elements.depositTab.addEventListener("click", () => setMode("deposit"));
   elements.transferTab.addEventListener("click", () => setMode("transfer"));
-  elements.resetButton.addEventListener("click", async () => {
-    Object.assign(state, createInitialState());
-    await seedDemo();
+  elements.resetButton.addEventListener("click", () => {
+    state.resetMode = !state.resetMode;
+    render();
+  });
+
+  elements.ledgerList.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-reset-action]");
+    if (!button) return;
+    state.actions = removeActionAndDependents(button.dataset.resetAction);
+    await rebuildState();
     render();
   });
 
@@ -46,32 +53,40 @@ function bindEvents() {
     const amount = Number(elements.depositAmount.value);
     if (!Number.isInteger(amount) || amount < 1) return;
 
-    await deposit({
+    state.actions.push({
+      id: crypto.randomUUID(),
+      type: "deposit",
       owner: elements.depositOwner.value,
-      amount
+      amount,
+      serial: randomHex(),
+      secret: randomHex()
     });
+
+    await rebuildState();
     render();
   });
 
   elements.transferForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const note = state.notes.find((candidate) => candidate.id === elements.inputNote.value);
+    const inputNote = state.notes.find((candidate) => candidate.id === elements.inputNote.value);
     const amount = Number(elements.transferAmount.value);
-    if (!note || !Number.isInteger(amount) || amount < 1 || amount >= note.amount) return;
+    if (!inputNote || !Number.isInteger(amount) || amount < 1 || amount >= inputNote.amount) return;
 
-    await transfer({
-      inputNote: note,
+    state.actions.push({
+      id: crypto.randomUUID(),
+      type: "transfer",
+      inputNoteId: inputNote.id,
       recipient: elements.recipient.value,
-      amount
+      amount,
+      receiverSerial: randomHex(),
+      receiverSecret: randomHex(),
+      changeSerial: randomHex(),
+      changeSecret: randomHex()
     });
+
+    await rebuildState();
     render();
   });
-}
-
-async function seedDemo() {
-  await deposit({ owner: "Alice", amount: 10 });
-  const aliceNote = state.notes.find((note) => note.owner === "Alice" && !note.spent);
-  await transfer({ inputNote: aliceNote, recipient: "Bob", amount: 4 });
 }
 
 function setMode(mode) {
@@ -82,14 +97,77 @@ function setMode(mode) {
   elements.transferForm.classList.toggle("is-active", !isDeposit);
 }
 
-async function deposit({ owner, amount }) {
-  const note = await createNote({ owner, amount });
+function removeActionAndDependents(actionId) {
+  const removedActions = new Set([actionId]);
+  const removedNotes = new Set();
+
+  for (const action of state.actions) {
+    if (action.id === actionId) {
+      for (const noteId of outputNoteIds(action)) removedNotes.add(noteId);
+      break;
+    }
+  }
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+
+    for (const action of state.actions) {
+      if (removedActions.has(action.id)) continue;
+
+      if (action.type === "transfer" && removedNotes.has(action.inputNoteId)) {
+        removedActions.add(action.id);
+        for (const noteId of outputNoteIds(action)) removedNotes.add(noteId);
+        changed = true;
+      }
+    }
+  }
+
+  return state.actions.filter((action) => !removedActions.has(action.id));
+}
+
+function outputNoteIds(action) {
+  if (action.type === "deposit") return [`note-${action.id}`];
+  if (action.type === "transfer") return [`receiver-${action.id}`, `change-${action.id}`];
+  return [];
+}
+
+async function rebuildState() {
+  state.notes = [];
+  state.commitments = [];
+  state.roots = ["0x0000000000000000000000000000000000000000000000000000000000000000"];
+  state.treeLayers = [];
+  state.nullifiers = [];
+  state.ledger = [];
+
+  for (const action of state.actions) {
+    if (action.type === "deposit") {
+      await replayDeposit(action);
+    }
+
+    if (action.type === "transfer") {
+      await replayTransfer(action);
+    }
+  }
+}
+
+async function replayDeposit(action) {
+  const note = await createNote({
+    id: `note-${action.id}`,
+    owner: action.owner,
+    amount: action.amount,
+    serial: action.serial,
+    secret: action.secret,
+    sourceActionId: action.id
+  });
+
   state.notes.push(note);
   state.commitments.push(note.commitment);
   await updateMerkleState();
   state.ledger.unshift({
+    id: action.id,
     type: "deposit",
-    title: `${owner} deposit`,
+    title: `${action.owner} deposit`,
     fields: {
       commitment: note.commitment,
       root: state.roots.at(-1),
@@ -98,12 +176,26 @@ async function deposit({ owner, amount }) {
   });
 }
 
-async function transfer({ inputNote, recipient, amount }) {
+async function replayTransfer(action) {
+  const inputNote = state.notes.find((note) => note.id === action.inputNoteId && !note.spent);
+  if (!inputNote || action.amount >= inputNote.amount) return;
+
   const oldRoot = state.roots.at(-1);
-  const receiverNote = await createNote({ owner: recipient, amount });
+  const receiverNote = await createNote({
+    id: `receiver-${action.id}`,
+    owner: action.recipient,
+    amount: action.amount,
+    serial: action.receiverSerial,
+    secret: action.receiverSecret,
+    sourceActionId: action.id
+  });
   const changeNote = await createNote({
+    id: `change-${action.id}`,
     owner: inputNote.owner,
-    amount: inputNote.amount - amount
+    amount: inputNote.amount - action.amount,
+    serial: action.changeSerial,
+    secret: action.changeSecret,
+    sourceActionId: action.id
   });
   const nullifier = await hashParts("nullifier", inputNote.serial);
   const proof = await hashParts("mock-proof", inputNote.commitment, nullifier, receiverNote.commitment, changeNote.commitment);
@@ -114,8 +206,9 @@ async function transfer({ inputNote, recipient, amount }) {
   state.commitments.push(receiverNote.commitment, changeNote.commitment);
   await updateMerkleState();
   state.ledger.unshift({
+    id: action.id,
     type: "transfer",
-    title: `${inputNote.owner} -> ${recipient}`,
+    title: `${inputNote.owner} -> ${action.recipient}`,
     fields: {
       root: oldRoot,
       nullifier,
@@ -133,6 +226,8 @@ function render() {
   elements.commitmentCount.textContent = state.commitments.length;
   elements.nullifierCount.textContent = state.nullifiers.length;
   elements.currentRoot.textContent = shortHash(state.roots.at(-1));
+  elements.resetButton.textContent = state.resetMode ? "Done" : "Reset";
+  elements.resetButton.classList.toggle("is-active", state.resetMode);
 
   renderInputNotes();
   renderLedger();
@@ -162,9 +257,15 @@ function renderInputNotes() {
 function renderLedger() {
   elements.ledgerList.innerHTML = "";
 
+  if (state.ledger.length === 0) {
+    elements.ledgerList.innerHTML = `<div class="empty-state">No ledger entries yet</div>`;
+    return;
+  }
+
   for (const entry of state.ledger) {
     const node = elements.ledgerTemplate.content.firstElementChild.cloneNode(true);
     node.classList.add(entry.type);
+    node.classList.toggle("is-resettable", state.resetMode);
     node.querySelector(".entry-title").textContent = entry.title;
     const fields = node.querySelector(".entry-fields");
 
@@ -176,12 +277,26 @@ function renderLedger() {
       fields.append(term, details);
     }
 
+    if (state.resetMode) {
+      const resetButton = document.createElement("button");
+      resetButton.className = "entry-reset-button";
+      resetButton.type = "button";
+      resetButton.dataset.resetAction = entry.id;
+      resetButton.textContent = "Reset entry";
+      node.append(resetButton);
+    }
+
     elements.ledgerList.append(node);
   }
 }
 
 function renderNotes() {
   elements.notesList.innerHTML = "";
+
+  if (state.notes.length === 0) {
+    elements.notesList.innerHTML = `<div class="empty-state">No private notes yet</div>`;
+    return;
+  }
 
   for (const note of state.notes.slice().reverse()) {
     const card = document.createElement("div");
@@ -258,17 +373,16 @@ async function buildMerkleLayers(commitments) {
   return layers;
 }
 
-async function createNote({ owner, amount }) {
-  const serial = randomHex();
-  const secret = randomHex();
+async function createNote({ id, owner, amount, serial, secret, sourceActionId }) {
   const commitment = await hashParts("note", amount, serial, secret, owner);
   return {
-    id: crypto.randomUUID(),
+    id,
     owner,
     amount,
     serial,
     secret,
     commitment,
+    sourceActionId,
     spent: false
   };
 }
@@ -318,11 +432,13 @@ function shortHash(value) {
 
 function createInitialState() {
   return {
+    actions: [],
     notes: [],
     commitments: [],
     roots: ["0x0000000000000000000000000000000000000000000000000000000000000000"],
     treeLayers: [],
     nullifiers: [],
-    ledger: []
+    ledger: [],
+    resetMode: false
   };
 }

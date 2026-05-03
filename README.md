@@ -18,12 +18,14 @@ npm run web
 
 Open the forwarded Codespaces port in your browser. The web app lets you run deposits and private transfers while watching the shielded pool, public ledger, wallet notes, Merkle root, and nullifiers update.
 
-The command-line simulation is still available:
+The command-line prototype is interactive:
 
 ```bash
 npm test
 npm run demo
 ```
+
+Use the CLI menu to deposit into the shielded pool, create private transfers, inspect private wallet notes, inspect the public ledger, and view the current pool state.
 
 The simulation uses a mock proof system so it can run without a trusted setup or generated verifier. The circuit and contract files show the production path:
 

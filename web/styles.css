@@ -205,6 +205,12 @@ select:focus {
   color: #5e4c1f;
 }
 
+.ghost-button.is-active {
+  background: rgba(212, 92, 106, 0.1);
+  border-color: rgba(212, 92, 106, 0.34);
+  color: #8a303d;
+}
+
 .inspector-grid {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
@@ -254,12 +260,17 @@ select:focus {
 
 .ledger-entry {
   display: grid;
-  grid-template-columns: 12px 1fr;
+  grid-template-columns: 12px minmax(0, 1fr);
   gap: 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fbfcfa;
   padding: 14px;
+}
+
+.ledger-entry.is-resettable {
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  align-items: start;
 }
 
 .entry-marker {
@@ -271,6 +282,17 @@ select:focus {
 
 .ledger-entry.transfer .entry-marker {
   background: var(--rose);
+}
+
+.entry-reset-button {
+  min-height: 34px;
+  border: 1px solid rgba(212, 92, 106, 0.3);
+  border-radius: 7px;
+  background: rgba(212, 92, 106, 0.1);
+  color: #8a303d;
+  font-size: 0.78rem;
+  font-weight: 850;
+  padding: 0 10px;
 }
 
 .entry-title,
