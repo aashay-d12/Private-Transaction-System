@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Private Transaction System</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">zk-SNARK shielded pool</p>
+          <h1>Private Transaction System</h1>
+        </div>
+        <div class="status-strip" aria-label="pool status">
+          <div class="status-item">
+            <span>Pool Value</span>
+            <strong id="poolValue">0</strong>
+          </div>
+          <div class="status-item">
+            <span>Commitments</span>
+            <strong id="commitmentCount">0</strong>
+          </div>
+          <div class="status-item">
+            <span>Spent Nullifiers</span>
+            <strong id="nullifierCount">0</strong>
+          </div>
+        </div>
+      </header>
+
+      <section class="command-band">
+        <div class="tabs" role="tablist" aria-label="transaction mode">
+          <button class="tab is-active" id="depositTab" type="button">Deposit</button>
+          <button class="tab" id="transferTab" type="button">Private Transfer</button>
+        </div>
+
+        <form class="action-panel is-active" id="depositForm">
+          <label>
+            Owner
+            <select id="depositOwner"></select>
+          </label>
+          <label>
+            Amount
+            <input id="depositAmount" min="1" step="1" type="number" value="10">
+          </label>
+          <button class="primary-button" type="submit">Create Commitment</button>
+        </form>
+
+        <form class="action-panel" id="transferForm">
+          <label>
+            Spend Note
+            <select id="inputNote"></select>
+          </label>
+          <label>
+            Receiver
+            <select id="recipient"></select>
+          </label>
+          <label>
+            Amount
+            <input id="transferAmount" min="1" step="1" type="number" value="4">
+          </label>
+          <button class="primary-button" type="submit">Generate Proof</button>
+        </form>
+      </section>
+
+      <section class="inspector-grid">
+        <article class="panel ledger-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">public chain data</p>
+              <h2>Ledger</h2>
+            </div>
+            <button class="ghost-button" id="resetButton" type="button">Reset</button>
+          </div>
+          <div class="ledger-list" id="ledgerList"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">wallet side</p>
+              <h2>Private Notes</h2>
+            </div>
+          </div>
+          <div class="notes-list" id="notesList"></div>
+        </article>
+
+        <article class="panel root-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">state root</p>
+              <h2>Merkle Tree</h2>
+            </div>
+          </div>
+          <div class="root-card">
+            <span>Current Root</span>
+            <code id="currentRoot">0x00000000</code>
+          </div>
+          <div class="tree-grid" id="treeGrid"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">one-time spend tags</p>
+              <h2>Nullifiers</h2>
+            </div>
+          </div>
+          <div class="nullifier-list" id="nullifierList"></div>
+        </article>
+      </section>
+    </main>
+
+    <template id="ledgerTemplate">
+      <div class="ledger-entry">
+        <div class="entry-marker"></div>
+        <div>
+          <div class="entry-title"></div>
+          <dl class="entry-fields"></dl>
+        </div>
+      </div>
+    </template>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

@@ -13,6 +13,14 @@ This repo is a BTP-oriented prototype for a Zcash-style private payment system. 
 
 ```bash
 npm install
+npm run web
+```
+
+Open the forwarded Codespaces port in your browser. The web app lets you run deposits and private transfers while watching the shielded pool, public ledger, wallet notes, Merkle root, and nullifiers update.
+
+The command-line simulation is still available:
+
+```bash
 npm test
 npm run demo
 ```
