@@ -86,7 +86,7 @@ async function deposit({ owner, amount }) {
   const note = await createNote({ owner, amount });
   state.notes.push(note);
   state.commitments.push(note.commitment);
-  state.roots.push(await merkleRoot(state.commitments));
+  await updateMerkleState();
   state.ledger.unshift({
     type: "deposit",
     title: `${owner} deposit`,
@@ -99,6 +99,7 @@ async function deposit({ owner, amount }) {
 }
 
 async function transfer({ inputNote, recipient, amount }) {
+  const oldRoot = state.roots.at(-1);
   const receiverNote = await createNote({ owner: recipient, amount });
   const changeNote = await createNote({
     owner: inputNote.owner,
@@ -111,12 +112,12 @@ async function transfer({ inputNote, recipient, amount }) {
   state.notes.push(receiverNote, changeNote);
   state.nullifiers.push(nullifier);
   state.commitments.push(receiverNote.commitment, changeNote.commitment);
-  state.roots.push(await merkleRoot(state.commitments));
+  await updateMerkleState();
   state.ledger.unshift({
     type: "transfer",
     title: `${inputNote.owner} -> ${recipient}`,
     fields: {
-      root: state.roots.at(-2),
+      root: oldRoot,
       nullifier,
       outputA: receiverNote.commitment,
       outputB: changeNote.commitment,
@@ -201,30 +202,60 @@ function renderNotes() {
 
 function renderTree() {
   elements.treeGrid.innerHTML = "";
+  const layers = state.treeLayers.length > 0 ? state.treeLayers : [[state.roots.at(-1)]];
+  const displayLayers = layers.slice().reverse();
 
-  for (let index = 0; index < 16; index += 1) {
-    const leaf = document.createElement("div");
-    const commitment = state.commitments[index];
-    leaf.className = `tree-leaf ${commitment ? "is-filled" : ""}`;
-    leaf.textContent = commitment ? shortHash(commitment).replace("0x", "") : "empty";
-    elements.treeGrid.append(leaf);
-  }
+  displayLayers.forEach((layer, displayIndex) => {
+    const originalLayerIndex = displayLayers.length - displayIndex - 1;
+    const row = document.createElement("div");
+    row.className = "tree-row";
+    row.style.setProperty("--node-count", layer.length);
+
+    layer.forEach((hash, nodeIndex) => {
+      const node = document.createElement("div");
+      const isRoot = originalLayerIndex === layers.length - 1;
+      const isLeaf = originalLayerIndex === 0;
+      const isFilledLeaf = isLeaf && nodeIndex < state.commitments.length;
+      const label = isRoot ? "Root" : isLeaf ? `L${nodeIndex}` : `H${originalLayerIndex}.${nodeIndex}`;
+
+      node.className = [
+        "tree-node",
+        isRoot ? "is-root" : "",
+        isLeaf ? "is-leaf" : "",
+        isFilledLeaf ? "is-filled" : ""
+      ].filter(Boolean).join(" ");
+      node.innerHTML = `<span>${label}</span><code>${shortHash(hash).replace("0x", "")}</code>`;
+      row.append(node);
+    });
+
+    elements.treeGrid.append(row);
+  });
 }
 
-function renderNullifiers() {
-  elements.nullifierList.innerHTML = "";
+async function updateMerkleState() {
+  state.treeLayers = await buildMerkleLayers(state.commitments);
+  state.roots.push(state.treeLayers.at(-1)[0]);
+}
 
-  if (state.nullifiers.length === 0) {
-    elements.nullifierList.innerHTML = `<div class="empty-state">No spent notes</div>`;
-    return;
+async function buildMerkleLayers(commitments) {
+  const leaves = commitments.slice(0, 16);
+  while (leaves.length < 16) {
+    leaves.push(await hashParts("zero", leaves.length));
   }
 
-  for (const nullifier of state.nullifiers.slice().reverse()) {
-    const chip = document.createElement("code");
-    chip.className = "nullifier-chip";
-    chip.textContent = shortHash(nullifier);
-    elements.nullifierList.append(chip);
+  const layers = [leaves];
+  let layer = leaves;
+
+  while (layer.length > 1) {
+    const next = [];
+    for (let index = 0; index < layer.length; index += 2) {
+      next.push(await hashParts(layer[index], layer[index + 1]));
+    }
+    layers.push(next);
+    layer = next;
   }
+
+  return layers;
 }
 
 async function createNote({ owner, amount }) {
@@ -242,22 +273,20 @@ async function createNote({ owner, amount }) {
   };
 }
 
-async function merkleRoot(commitments) {
-  const leaves = commitments.slice(0, 16);
-  while (leaves.length < 16) {
-    leaves.push(await hashParts("zero", leaves.length));
+function renderNullifiers() {
+  elements.nullifierList.innerHTML = "";
+
+  if (state.nullifiers.length === 0) {
+    elements.nullifierList.innerHTML = `<div class="empty-state">No spent notes</div>`;
+    return;
   }
 
-  let layer = leaves;
-  while (layer.length > 1) {
-    const next = [];
-    for (let index = 0; index < layer.length; index += 2) {
-      next.push(await hashParts(layer[index], layer[index + 1]));
-    }
-    layer = next;
+  for (const nullifier of state.nullifiers.slice().reverse()) {
+    const chip = document.createElement("code");
+    chip.className = "nullifier-chip";
+    chip.textContent = shortHash(nullifier);
+    elements.nullifierList.append(chip);
   }
-
-  return layer[0];
 }
 
 async function hashParts(...parts) {
@@ -292,6 +321,7 @@ function createInitialState() {
     notes: [],
     commitments: [],
     roots: ["0x0000000000000000000000000000000000000000000000000000000000000000"],
+    treeLayers: [],
     nullifiers: [],
     ledger: []
   };

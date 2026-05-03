@@ -349,30 +349,77 @@ code,
   font-size: 0.86rem;
 }
 
-.tree-grid {
+.tree-visual {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  gap: 18px;
+  overflow-x: auto;
   padding: 18px;
 }
 
-.tree-leaf {
-  aspect-ratio: 1;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  background: #f0f2ee;
+.tree-row {
   display: grid;
-  place-items: center;
-  color: var(--muted);
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  font-size: 0.72rem;
-  overflow: hidden;
+  grid-template-columns: repeat(var(--node-count), minmax(72px, 1fr));
+  gap: 12px;
+  min-width: 720px;
+  position: relative;
 }
 
-.tree-leaf.is-filled {
+.tree-row:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 5%;
+  right: 5%;
+  bottom: -10px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(102, 112, 125, 0.35), transparent);
+}
+
+.tree-node {
+  min-height: 54px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #f4f6f2;
+  display: grid;
+  align-content: center;
+  gap: 5px;
+  padding: 8px;
+  overflow: hidden;
+  text-align: center;
+  position: relative;
+}
+
+.tree-node::before {
+  content: "";
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  width: 1px;
+  height: 12px;
+  background: rgba(102, 112, 125, 0.35);
+}
+
+.tree-row:first-child .tree-node::before {
+  display: none;
+}
+
+.tree-node span {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 850;
+}
+
+.tree-node code {
+  font-size: 0.68rem;
+}
+
+.tree-node.is-root {
+  border-color: rgba(47, 154, 132, 0.5);
+  background: rgba(47, 154, 132, 0.14);
+}
+
+.tree-node.is-filled {
   background: linear-gradient(135deg, rgba(47, 154, 132, 0.18), rgba(214, 154, 45, 0.18));
   border-color: rgba(47, 154, 132, 0.38);
-  color: var(--ink);
 }
 
 .nullifier-chip {
@@ -429,7 +476,7 @@ code,
     grid-template-columns: 1fr;
   }
 
-  .tree-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .tree-row {
+    min-width: 620px;
   }
 }
