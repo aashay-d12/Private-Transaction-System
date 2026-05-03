@@ -207,7 +207,7 @@ select:focus {
 
 .inspector-grid {
   display: grid;
-  grid-template-columns: minmax(360px, 1.1fr) minmax(320px, 0.9fr);
+  grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: 18px;
   align-items: start;
 }
@@ -229,7 +229,19 @@ select:focus {
 }
 
 .ledger-panel {
-  grid-row: span 2;
+  grid-column: span 7;
+}
+
+.notes-panel {
+  grid-column: span 5;
+}
+
+.root-panel {
+  grid-column: span 8;
+}
+
+.nullifier-panel {
+  grid-column: span 4;
 }
 
 .ledger-list,
@@ -331,22 +343,24 @@ code,
   color: var(--rose);
 }
 
-.root-panel {
-  background: linear-gradient(180deg, #ffffff, #f7faf8);
-}
-
 .root-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
   margin: 18px 18px 0;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fbfcfa;
-  padding: 14px;
+  background: linear-gradient(135deg, rgba(47, 154, 132, 0.1), rgba(255, 255, 255, 0.96));
+  padding: 16px;
 }
 
 .root-card code {
   display: block;
-  margin-top: 8px;
-  font-size: 0.86rem;
+  justify-self: end;
+  max-width: 100%;
+  font-size: 0.9rem;
+  text-align: right;
 }
 
 .tree-visual {
@@ -423,10 +437,20 @@ code,
 }
 
 .nullifier-chip {
+  display: block;
   border: 1px solid rgba(212, 92, 106, 0.28);
   border-radius: 8px;
   background: rgba(212, 92, 106, 0.08);
   padding: 12px;
+  line-height: 1.4;
+}
+
+.nullifier-panel .nullifier-list {
+  grid-template-columns: 1fr;
+}
+
+.nullifier-panel .panel-heading {
+  min-height: 86px;
 }
 
 .empty-state {
@@ -444,17 +468,23 @@ code,
 
   .topbar,
   .command-band,
-  .inspector-grid,
   .action-panel {
     grid-template-columns: 1fr;
+  }
+
+  .inspector-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .status-strip {
     grid-template-columns: 1fr 1fr;
   }
 
-  .ledger-panel {
-    grid-row: auto;
+  .ledger-panel,
+  .notes-panel,
+  .root-panel,
+  .nullifier-panel {
+    grid-column: span 2;
   }
 }
 
@@ -470,6 +500,26 @@ code,
   .status-strip,
   .tabs {
     grid-template-columns: 1fr;
+  }
+
+  .inspector-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ledger-panel,
+  .notes-panel,
+  .root-panel,
+  .nullifier-panel {
+    grid-column: span 1;
+  }
+
+  .root-card {
+    grid-template-columns: 1fr;
+  }
+
+  .root-card code {
+    justify-self: start;
+    text-align: left;
   }
 
   .entry-fields {
