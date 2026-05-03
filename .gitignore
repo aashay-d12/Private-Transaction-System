@@ -1,0 +1,8 @@
+node_modules/
+artifacts/
+cache/
+build/
+coverage/
+.hardhat-home/
+*.log
+.env

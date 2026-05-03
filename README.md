@@ -12,6 +12,7 @@ This repo is a BTP-oriented prototype for a Zcash-style private payment system. 
 ## Quick Start
 
 ```bash
+npm install
 npm test
 npm run demo
 ```
@@ -19,7 +20,6 @@ npm run demo
 The simulation uses a mock proof system so it can run without a trusted setup or generated verifier. The circuit and contract files show the production path:
 
 ```bash
-npm install
 npm run compile:circuit
 npm run compile:contracts
 ```

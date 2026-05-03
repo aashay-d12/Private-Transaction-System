@@ -1,0 +1,26 @@
+{
+  "name": "anonymous-zk-payment-system",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Educational Zcash-style shielded payment prototype using note commitments, Merkle roots, nullifiers, Circom circuits, and Solidity contracts.",
+  "scripts": {
+    "demo": "node src/demo.js",
+    "test": "node test/shieldedPool.test.js",
+    "compile:contracts": "node scripts/compile-contracts.cjs",
+    "compile:circuit": "node scripts/compile-circuit.cjs"
+  },
+  "keywords": [
+    "zk-snark",
+    "zcash",
+    "shielded-pool",
+    "circom",
+    "hardhat"
+  ],
+  "devDependencies": {
+    "circom2": "^0.2.22",
+    "circomlib": "^2.0.5",
+    "hardhat": "^2.22.19",
+    "snarkjs": "^0.7.5"
+  }
+}
