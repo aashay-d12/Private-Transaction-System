@@ -103,15 +103,11 @@ async function transferFlow() {
   const inputId = await ask("Input note id to spend: ");
   const inputNote = spendableNotes.find((note) => note.id.toLowerCase() === inputId.trim().toLowerCase());
   if (!inputNote) throw new Error("Unknown or already spent input note");
-  if (inputNote.amount <= 1) {
-    throw new Error("This two-output prototype needs a note larger than 1 so it can create receiver value and change");
-  }
-
   const recipient = await askUser("Recipient");
   const amount = await askInteger("Amount to transfer", {
     min: 1,
-    max: inputNote.amount - 1,
-    maxMessage: `This prototype requires positive change, so transfer less than ${inputNote.amount}`
+    max: inputNote.amount,
+    maxMessage: `Enter a value up to ${inputNote.amount}.`
   });
 
   const transfer = pool.createTransfer({
@@ -127,17 +123,19 @@ async function transferFlow() {
     note: transfer.privateOutputs.receiverNote,
     source: `received from ${inputNote.owner}`
   });
-  const changeWalletNote = storeNote({
-    owner: inputNote.owner,
-    note: transfer.privateOutputs.changeNote,
-    source: `change from ${inputNote.id}`
-  });
+  const changeWalletNote = transfer.privateOutputs.changeNote
+    ? storeNote({
+        owner: inputNote.owner,
+        note: transfer.privateOutputs.changeNote,
+        source: `change from ${inputNote.id}`
+      })
+    : null;
 
   ledger.unshift({
     type: "transfer",
     fromNoteId: inputNote.id,
     receiverNoteId: receiverWalletNote.id,
-    changeNoteId: changeWalletNote.id,
+    changeNoteId: changeWalletNote?.id,
     root: transfer.transaction.publicInputs.root,
     nullifier: transfer.transaction.publicInputs.nullifier,
     outputCommitments: transfer.transaction.publicInputs.outputCommitments,
@@ -147,7 +145,11 @@ async function transferFlow() {
   console.log("\nTransfer accepted.");
   console.log(`Spent nullifier: ${shortHash(transfer.transaction.publicInputs.nullifier)}`);
   console.log(`Receiver note: ${receiverWalletNote.id} (${recipient}, amount ${amount})`);
-  console.log(`Change note: ${changeWalletNote.id} (${inputNote.owner}, amount ${changeWalletNote.amount})`);
+  if (changeWalletNote) {
+    console.log(`Change note: ${changeWalletNote.id} (${inputNote.owner}, amount ${changeWalletNote.amount})`);
+  } else {
+    console.log(`${inputNote.owner}'s input note was fully spent.`);
+  }
   console.log(`New root: ${shortHash(receipt.newRoot)}`);
 }
 

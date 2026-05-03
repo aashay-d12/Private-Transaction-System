@@ -456,9 +456,27 @@ code,
   background: rgba(47, 154, 132, 0.14);
 }
 
+.tree-node.is-computed {
+  background: #f7f8f5;
+  border-style: dashed;
+}
+
 .tree-node.is-filled {
   background: linear-gradient(135deg, rgba(47, 154, 132, 0.18), rgba(214, 154, 45, 0.18));
   border-color: rgba(47, 154, 132, 0.38);
+}
+
+.tree-node.is-empty {
+  background: #f8f9f6;
+  border-color: rgba(102, 112, 125, 0.18);
+  border-style: dashed;
+  opacity: 0.58;
+}
+
+.tree-node.is-empty code {
+  color: var(--muted);
+  font-family: inherit;
+  font-weight: 800;
 }
 
 .nullifier-chip {

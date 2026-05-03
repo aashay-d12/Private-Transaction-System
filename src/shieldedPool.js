@@ -31,8 +31,8 @@ export class ShieldedPool {
       throw new Error("Transfer amount must be a positive integer");
     }
 
-    if (amount >= inputNote.amount) {
-      throw new Error("Transfer amount must leave positive change in this two-output prototype");
+    if (amount > inputNote.amount) {
+      throw new Error("Transfer amount cannot exceed the input note amount");
     }
 
     const inputIndex = this.tree.indexOf(inputNote.commitment);
@@ -49,10 +49,14 @@ export class ShieldedPool {
       ownerPublicKey: recipientPublicKey
     });
 
-    const changeNote = this.proofSystem.createOutputNote({
-      amount: inputNote.amount - amount,
-      ownerPublicKey: inputNote.ownerPublicKey
-    });
+    const changeAmount = inputNote.amount - amount;
+    const changeNote = changeAmount > 0
+      ? this.proofSystem.createOutputNote({
+          amount: changeAmount,
+          ownerPublicKey: inputNote.ownerPublicKey
+        })
+      : null;
+    const outputNotes = changeNote ? [receiverNote, changeNote] : [receiverNote];
 
     const root = this.tree.root();
     const inputPath = this.tree.path(inputIndex);
@@ -61,7 +65,7 @@ export class ShieldedPool {
       inputNote,
       inputPath,
       root,
-      outputNotes: [receiverNote, changeNote]
+      outputNotes
     });
 
     return {

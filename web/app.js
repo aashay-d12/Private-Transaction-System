@@ -27,7 +27,7 @@ init();
 
 function init() {
   fillSelect(elements.depositOwner, users);
-  fillSelect(elements.recipient, users.filter((user) => user !== "Alice"));
+  fillSelect(elements.recipient, users);
   bindEvents();
   rebuildState().then(render);
 }
@@ -70,7 +70,7 @@ function bindEvents() {
     event.preventDefault();
     const inputNote = state.notes.find((candidate) => candidate.id === elements.inputNote.value);
     const amount = Number(elements.transferAmount.value);
-    if (!inputNote || !Number.isInteger(amount) || amount < 1 || amount >= inputNote.amount) return;
+    if (!inputNote || !Number.isInteger(amount) || amount < 1 || amount > inputNote.amount) return;
 
     state.actions.push({
       id: crypto.randomUUID(),
@@ -178,7 +178,7 @@ async function replayDeposit(action) {
 
 async function replayTransfer(action) {
   const inputNote = state.notes.find((note) => note.id === action.inputNoteId && !note.spent);
-  if (!inputNote || action.amount >= inputNote.amount) return;
+  if (!inputNote || action.amount > inputNote.amount) return;
 
   const oldRoot = state.roots.at(-1);
   const receiverNote = await createNote({
@@ -189,33 +189,39 @@ async function replayTransfer(action) {
     secret: action.receiverSecret,
     sourceActionId: action.id
   });
-  const changeNote = await createNote({
-    id: `change-${action.id}`,
-    owner: inputNote.owner,
-    amount: inputNote.amount - action.amount,
-    serial: action.changeSerial,
-    secret: action.changeSecret,
-    sourceActionId: action.id
-  });
+  const changeAmount = inputNote.amount - action.amount;
+  const changeNote = changeAmount > 0
+    ? await createNote({
+        id: `change-${action.id}`,
+        owner: inputNote.owner,
+        amount: changeAmount,
+        serial: action.changeSerial,
+        secret: action.changeSecret,
+        sourceActionId: action.id
+      })
+    : null;
   const nullifier = await hashParts("nullifier", inputNote.serial);
-  const proof = await hashParts("mock-proof", inputNote.commitment, nullifier, receiverNote.commitment, changeNote.commitment);
+  const outputNotes = changeNote ? [receiverNote, changeNote] : [receiverNote];
+  const proof = await hashParts("mock-proof", inputNote.commitment, nullifier, outputNotes.map((note) => note.commitment));
 
   inputNote.spent = true;
-  state.notes.push(receiverNote, changeNote);
+  state.notes.push(...outputNotes);
   state.nullifiers.push(nullifier);
-  state.commitments.push(receiverNote.commitment, changeNote.commitment);
+  state.commitments.push(...outputNotes.map((note) => note.commitment));
   await updateMerkleState();
+  const fields = {
+    root: oldRoot,
+    nullifier,
+    outputA: receiverNote.commitment
+  };
+  if (changeNote) fields.outputB = changeNote.commitment;
+  fields.proof = proof;
+
   state.ledger.unshift({
     id: action.id,
     type: "transfer",
     title: `${inputNote.owner} -> ${action.recipient}`,
-    fields: {
-      root: oldRoot,
-      nullifier,
-      outputA: receiverNote.commitment,
-      outputB: changeNote.commitment,
-      proof
-    }
+    fields
   });
 }
 
@@ -237,7 +243,7 @@ function render() {
 }
 
 function renderInputNotes() {
-  const spendable = state.notes.filter((note) => !note.spent && note.amount > 1);
+  const spendable = state.notes.filter((note) => !note.spent && note.amount > 0);
   elements.inputNote.innerHTML = "";
 
   for (const note of spendable) {
@@ -331,20 +337,32 @@ function renderTree() {
       const isRoot = originalLayerIndex === layers.length - 1;
       const isLeaf = originalLayerIndex === 0;
       const isFilledLeaf = isLeaf && nodeIndex < state.commitments.length;
-      const label = isRoot ? "Root" : isLeaf ? `L${nodeIndex}` : `H${originalLayerIndex}.${nodeIndex}`;
+      const isEmptyLeaf = isLeaf && !isFilledLeaf;
+      const isComputed = !isRoot && !isLeaf;
+      const label = getTreeNodeLabel({ isRoot, isLeaf, isFilledLeaf, nodeIndex });
+      const value = isEmptyLeaf ? "Empty" : shortHash(hash).replace("0x", "");
 
       node.className = [
         "tree-node",
         isRoot ? "is-root" : "",
         isLeaf ? "is-leaf" : "",
-        isFilledLeaf ? "is-filled" : ""
+        isFilledLeaf ? "is-filled" : "",
+        isEmptyLeaf ? "is-empty" : "",
+        isComputed ? "is-computed" : ""
       ].filter(Boolean).join(" ");
-      node.innerHTML = `<span>${label}</span><code>${shortHash(hash).replace("0x", "")}</code>`;
+      node.innerHTML = `<span>${label}</span><code>${value}</code>`;
       row.append(node);
     });
 
     elements.treeGrid.append(row);
   });
+}
+
+function getTreeNodeLabel({ isRoot, isLeaf, isFilledLeaf, nodeIndex }) {
+  if (isRoot) return "Current root";
+  if (isFilledLeaf) return `Commitment L${nodeIndex}`;
+  if (isLeaf) return `Empty L${nodeIndex}`;
+  return "Computed hash";
 }
 
 async function updateMerkleState() {
