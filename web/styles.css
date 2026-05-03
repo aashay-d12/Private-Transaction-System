@@ -237,11 +237,11 @@ select:focus {
 }
 
 .root-panel {
-  grid-column: span 8;
+  grid-column: span 7;
 }
 
 .nullifier-panel {
-  grid-column: span 4;
+  grid-column: span 5;
 }
 
 .ledger-list,
@@ -345,7 +345,7 @@ code,
 
 .root-card {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: minmax(96px, auto) minmax(0, 1fr);
   gap: 14px;
   align-items: center;
   margin: 18px 18px 0;
@@ -361,6 +361,9 @@ code,
   max-width: 100%;
   font-size: 0.9rem;
   text-align: right;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.72);
 }
 
 .tree-visual {
@@ -437,16 +440,18 @@ code,
 }
 
 .nullifier-chip {
-  display: block;
+  display: flex;
+  align-items: center;
+  min-height: 42px;
   border: 1px solid rgba(212, 92, 106, 0.28);
   border-radius: 8px;
   background: rgba(212, 92, 106, 0.08);
-  padding: 12px;
+  padding: 11px 12px;
   line-height: 1.4;
 }
 
 .nullifier-panel .nullifier-list {
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
 }
 
 .nullifier-panel .panel-heading {
